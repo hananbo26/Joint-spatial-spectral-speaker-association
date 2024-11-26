@@ -15,7 +15,6 @@ function [xm,Pm,xp,Pp,beta]=JPDA_wkf_light(z,xm,Pm,H,F,R,Q,Pd,flag)
 % R - measurement error covariance matrix (1X1)
 % Q - process noise covariance matrix (2X2)
 % Pd - probability of detection (1XQ)
-% flag - see below (1X1 binary)
 %
 % outputs
 % -------
@@ -28,15 +27,12 @@ function [xm,Pm,xp,Pp,beta]=JPDA_wkf_light(z,xm,Pm,H,F,R,Q,Pd,flag)
 % Hanan Beit-On, June 2022
 
 
+% calculate association probabilities 
 for q=1:2
     S = H*Pm(:,:,q)*H.'+ R; %innovation covariance
     eta = normpdf(z + 2*pi*(-1:1),xm(1,q),sqrt(R)) ./ sum(normpdf(z + 2*pi*(-100:100),xm(1,q),sqrt(R))); % WKF innovation weights
     gt(q) = (z + 2*pi*(-1:1) - xm(1,q))*eta.'; % WKF innovation
-    if flag==1 
-        beta(q) = Pd(q)^2; % association based on spectral information alone
-    else
-        beta(q) = normpdf(gt(q),0,sqrt(S)) * Pd(q)^2; % posterior association probabilities [1] eq. (3.18)
-    end
+    beta(q) = normpdf(gt(q),0,sqrt(S)) * Pd(q)^2; % posterior association probabilities [1] eq. (3.18)
 end
 
 beta = beta./sum(beta); %normalize beta to ensure beta(1) + beta(2) = 1
@@ -45,12 +41,11 @@ beta = double(beta);
 
 for q=1:2
     % correct
-    % K = Pm(:,:,q)*H.'*inv(H*Pm(:,:,q)*H.'+ R);
     K = Pm(:,:,q)*H.'/(H*Pm(:,:,q)*H.'+ R);
     gt_weighted(q) = beta(q) * gt(q); %JPDA inovation is a weighted sum of the inovations
     xp(:,q) = xm(:,q) + K*gt_weighted(q);
     xp(1,q) = wrapToPi(xp(1,q));
-    Pp(:,:,q) = Pm(:,:,q) - K*H*Pm(:,:,q); % Pp = (eye(length(xm)) - K*H)*Pm;
+    Pp(:,:,q) = Pm(:,:,q) - K*H*Pm(:,:,q);
 
     % predict
     xm(:,q) = F*xp(:,q);
